@@ -122,6 +122,57 @@ export function sanitizeInput(text: string): string {
 }
 
 /**
+ * Recursively sanitize `?/.../?` triggers in AgentMessage content.
+ * Handles string content, text blocks, and nested arrays so that
+ * the `Array.isArray(input)` and single-message branches of
+ * `agent.prompt()` are also covered.
+ */
+export function sanitizeMessages(messages: unknown[]): void {
+	if (!Array.isArray(messages)) return;
+	for (const msg of messages) {
+		if (!msg || typeof msg !== "object") continue;
+		const content = (msg as Record<string, unknown>).content;
+		if (typeof content === "string") {
+			(msg as Record<string, unknown>).content = sanitizeInput(content);
+		} else if (Array.isArray(content)) {
+			for (const block of content) {
+				if (block && typeof block === "object" && (block as Record<string, unknown>).type === "text") {
+					const text = (block as Record<string, unknown>).text;
+					if (typeof text === "string") {
+						(block as Record<string, unknown>).text = sanitizeInput(text);
+					}
+				}
+			}
+		}
+	}
+}
+
+
+/**
+ * Recursively restore ``[VLT:<id>]`` references in AgentMessage content.
+ * Counterpart to sanitizeMessages — call before emitting messages to
+ * the UI so the user sees actual secret values, not opaque references.
+ */
+export function restoreMessages(messages: unknown[]): void {
+	if (!Array.isArray(messages)) return;
+	for (const msg of messages) {
+		if (!msg || typeof msg !== "object") continue;
+		const content = (msg as Record<string, unknown>).content;
+		if (typeof content === "string") {
+			(msg as Record<string, unknown>).content = restoreOutput(content);
+		} else if (Array.isArray(content)) {
+			for (const block of content) {
+				if (block && typeof block === "object" && (block as Record<string, unknown>).type === "text") {
+					const text = (block as Record<string, unknown>).text;
+					if (typeof text === "string") {
+						(block as Record<string, unknown>).text = restoreOutput(text);
+					}
+				}
+			}
+		}
+	}
+}
+/**
  * Replace ``[VLT:<id>]`` references in *text* with their stored
  * values.  Unresolved references pass through unchanged.
  */

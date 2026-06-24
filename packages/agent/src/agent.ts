@@ -22,7 +22,7 @@ import {
 	type ToolChoice,
 	type ToolResultMessage,
 } from "@oh-my-pi/pi-ai";
-import { sanitizeInput } from "./valut.js";
+import { sanitizeInput, sanitizeMessages, restoreMessages } from "./valut.js";
 import type { Dialect } from "@oh-my-pi/pi-ai/dialect";
 import type { HarmonyAuditEvent } from "@oh-my-pi/pi-ai/utils/harmony-leak";
 import { preferredDialect } from "@oh-my-pi/pi-catalog/identity";
@@ -744,9 +744,11 @@ export class Agent {
 		switch (event.type) {
 			case "message_start":
 			case "message_update":
+				restoreMessages([event.message]);
 				this.#state.streamMessage = event.message;
 				break;
 			case "message_end":
+				restoreMessages([event.message]);
 				this.#state.streamMessage = null;
 				this.appendMessage(event.message);
 				break;
@@ -967,7 +969,8 @@ export class Agent {
 		let images: ImageContent[] | undefined;
 
 		if (Array.isArray(input)) {
-			msgs = input;
+			sanitizeMessages(input);
+			msgs = input as AgentMessage[];
 			promptOptions = imagesOrOptions as AgentPromptOptions | undefined;
 		} else if (typeof input === "string") {
 			if (Array.isArray(imagesOrOptions)) {
@@ -989,6 +992,7 @@ export class Agent {
 				},
 			];
 		} else {
+			sanitizeMessages([input]);
 			msgs = [input];
 			promptOptions = imagesOrOptions as AgentPromptOptions | undefined;
 		}
